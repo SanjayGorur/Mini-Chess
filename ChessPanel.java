@@ -9,6 +9,8 @@ public class ChessPanel extends JPanel {
     private ArrayList<GamePiece> black, white, removedBlack, removedWhite;
     private GamePiece active;
     private ArrayList<Point> moves;
+    private boolean music;
+    private Clip clip;
 
     //constructer, defines black/white pieces
     public ChessPanel(ArrayList<GamePiece> bl, ArrayList<GamePiece> wh, ArrayList<GamePiece> rb, ArrayList<GamePiece> rw){
@@ -17,17 +19,26 @@ public class ChessPanel extends JPanel {
         removedBlack = rb;
         removedWhite = rw;
         setBackground(new Color(255,225,175));
-
         try
         {
-            Clip clip = AudioSystem.getClip();
+            clip = AudioSystem.getClip();
             clip.open(AudioSystem.getAudioInputStream(new File("Rondo.wav")));
             clip.loop(99999);
+            music = true;
         }
         catch (Exception exc)
         {
             System.out.println("Sound error (likely a mishandled wav file).");
         }
+    }
+
+    public void mute(){
+        if(music)
+            clip.stop();
+        else
+            clip.start();
+
+        music = !music;
     }
 
     //paints black squares of grid
@@ -134,10 +145,6 @@ public class ChessPanel extends JPanel {
 
 
         //write checkmate if the game has come to an end.
-        String checkmate = ChessGame.checkmate();
-        if(checkmate != null){
-            g.setColor(Color.RED);
-            g.drawString(checkmate + " has lost.", 50, 225);
-        }
+        ChessGame.checkmate();
     }
 }

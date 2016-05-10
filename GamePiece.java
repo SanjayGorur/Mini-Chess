@@ -1,11 +1,15 @@
 import java.util.ArrayList;
 
 public abstract class GamePiece {
-    //location of piece
-    Point p;
+    //location of piece and time of capture
+    private Point p;
+    private int time, width, height;
 
     //constructor, location accessor/mutator methods
-    public GamePiece(Point initp){ p = initp;}
+    public GamePiece(Point initp){
+        p = initp;
+        time = -1;
+    }
     public Point getLocation(){ return p;}
     public void setLocation(Point newP){ p = newP;}
 
@@ -114,5 +118,21 @@ public abstract class GamePiece {
             moves.add(new Point(loc));
     }
 
+    //finds if a point is completely empty of pieces
     public boolean isEmpty(ArrayList<GamePiece> pc1, ArrayList<GamePiece> pc2, Point loc){return ChessGame.findPiece(pc1, loc) == null && ChessGame.findPiece(pc2, loc) == null;}
+
+    //methods for dealing with time at which pieces are captured
+    public GamePiece setTime(int seconds){
+        time = seconds;
+        return this;
+    }
+    public int getTime(){return time;}
+
+    //method for determining the bullet-stage rules for movement and beginning position
+    public void randomize(int xmin, int xmax, int ymin, int ymax){p = new Point((int) (Math.random()*(xmax-xmin)+xmin), (int) (Math.random()*(ymax-ymin)+ymin));}
+    public abstract void move();
+
+    //methods for setting and determining relative size of piece based on type
+    public abstract int getWidth();
+    public abstract int getHeight();
 }

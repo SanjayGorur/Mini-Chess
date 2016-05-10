@@ -2,7 +2,8 @@ import java.util.ArrayList;
 
 public class Pawn extends GamePiece{
     //boolean for whether the pawn is white (defines direction of movement)
-    boolean white;
+    private boolean white;
+    private int direction;
 
     public ArrayList<Point> getMoves(ArrayList<GamePiece> friendPieces, ArrayList<GamePiece> foePieces){
         ArrayList<Point> moves = new ArrayList<>();
@@ -32,11 +33,19 @@ public class Pawn extends GamePiece{
 
         return moves;
     }
-    //constructor, ID, and offset definitions
+    //constructor (moves either up or down)
     public Pawn(Point p, boolean wPiece){
         super(p);
         white = wPiece;
+        if(Math.random()>.5)
+            direction=1;
+        else
+            direction=-1;
     }
+    //various class methods for class identity (King size) (~1.5x king speed)
     public String getID(){ return "P";}
     public int offSet(){return 9;}
+    public void move(){getLocation().incY(direction);}
+    public int getWidth(){return 10;}
+    public int getHeight(){return 10;}
 }

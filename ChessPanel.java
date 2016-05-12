@@ -1,48 +1,24 @@
 import javax.swing.*;
 import java.awt.*;
 import java.util.*;
-import java.io.*;
-import javax.sound.sampled.*;
 
 public class ChessPanel extends JPanel {
     //fields for black/white pieces, active (clicked) piece, active (highlighted) moves
     private ArrayList<GamePiece> black, white, removedBlack, removedWhite;
     private GamePiece active;
     private ArrayList<Point> moves;
-    private boolean music;
-    private Clip clip;
 
-    //constructer, defines black/white pieces
+    //constructor, defines black/white pieces
     public ChessPanel(ArrayList<GamePiece> bl, ArrayList<GamePiece> wh, ArrayList<GamePiece> rb, ArrayList<GamePiece> rw){
         black = bl;
         white = wh;
         removedBlack = rb;
         removedWhite = rw;
         setBackground(new Color(255,225,175));
-        try
-        {
-            clip = AudioSystem.getClip();
-            clip.open(AudioSystem.getAudioInputStream(new File("Rondo.wav")));
-            clip.loop(99999);
-            music = true;
-        }
-        catch (Exception exc)
-        {
-            System.out.println("Sound error (likely a mishandled wav file).");
-        }
-    }
-
-    public void mute(){
-        if(music)
-            clip.stop();
-        else
-            clip.start();
-
-        music = !music;
     }
 
     //paints black squares of grid
-    private void paintGrid(Graphics g){
+    public void paintGrid(Graphics g){
         for (int i = 0; i < 400; i += 50)
             for (int j = i%100; j < 400; j += 100)
                 g.fillRect(i, j, 50, 50);

@@ -6,24 +6,38 @@ import java.util.ArrayList;
 import java.util.Timer;
 import java.util.TimerTask;
 import static java.awt.event.KeyEvent.*;
+import java.io.*;
+import javax.sound.sampled.*;
 
 public class ChessGame implements MouseListener, KeyListener{
-    //Fields for the pieces, panel, and whether it's white's turn
+    //Fields for the pieces, panels, whether it's white's turn, the bullet game, or music is playing, the kings, frame and music player
     private static ArrayList<GamePiece> black, white, removedBlack, removedWhite;
     private static JPanel overall;
     private static ChessPanel panel;
     private static BulletPanel bulletPanel;
-    private static boolean whiteTurn, bulletGame;
+    private static boolean whiteTurn, bulletGame, musicOn;
     private static JFrame frame;
     private static King blackKing, whiteKing;
-
-    //Fields for the timer and time spent by white and black
+    private static Clip clip;
     private static int whiteTime, blackTime, whiteCollisions, blackCollisions;
 
     public static void main(String[] args){
+        //loop the initial music (Mozart Rondo Alla Turca)
+        try
+        {
+            clip = AudioSystem.getClip();
+            clip.open(AudioSystem.getAudioInputStream(new File("Rondo.wav")));
+            clip.loop(Clip.LOOP_CONTINUOUSLY);
+            musicOn = true;
+        }
+        catch (Exception exc)
+        {
+            System.out.println("Sound error (likely a mishandled wav file).");
+        }
+
         //make window
         frame = new JFrame("Ugly Chess");
-        frame.setSize(new Dimension(610,425));
+        frame.setSize(new Dimension(605,420));
 
         //define lists of black/white pieces
         black = new ArrayList<>();
@@ -237,8 +251,8 @@ public class ChessGame implements MouseListener, KeyListener{
             moves.addAll(trimMoves(p, white, black));
         //if there are no potential moves, white is in checkmate, remove mouselisteners, start a thread for the bullet game loop (to allow keylisteners)
         if (moves.size() == 0) {
-            ((CardLayout) overall.getLayout()).show(overall, "Bullet");
-            frame.removeMouseListener(frame.getMouseListeners()[0]);
+            if(frame.getMouseListeners().length>0)
+                frame.removeMouseListener(frame.getMouseListeners()[0]);
             Thread t = new Thread(new BulletThread(removedWhite));
             t.start();
             return;
@@ -249,18 +263,52 @@ public class ChessGame implements MouseListener, KeyListener{
         for (GamePiece p : black)
             moves.addAll(trimMoves(p, black, white));
         if (moves.size() == 0) {
-            ((CardLayout) overall.getLayout()).show(overall, "Bullet");
-            frame.removeMouseListener(frame.getMouseListeners()[0]);
+            if(frame.getMouseListeners().length>0)
+                frame.removeMouseListener(frame.getMouseListeners()[0]);
             Thread t = new Thread(new BulletThread(removedBlack));
             t.start();
         }
     }
+    //class to transition music in its own thread (to ensure smooth playback regardless of any lag)
+    private static class ClipThread implements Runnable{
+        public void run(){
+            try {
+                //leave a 1/10 second gap then play the transition music
+                clip.stop();
+                Thread.sleep(100);
+                clip = AudioSystem.getClip();
+                clip.open(AudioSystem.getAudioInputStream(new File("Transition.wav")));
+                if(musicOn)
+                    clip.start();
+
+                //after a predetermined length of the clip, loop the main music indefinitely (The Qemists - Stompbox (Spor Remix))
+                Thread.sleep(22200);
+
+                clip = AudioSystem.getClip();
+                clip.open(AudioSystem.getAudioInputStream(new File("Stompbox.wav")));
+                if(musicOn)
+                    clip.loop(Clip.LOOP_CONTINUOUSLY);
+            }catch(Exception e){
+                e.printStackTrace();
+            }
+        }
+    }
+
     private static class BulletThread implements Runnable{//calls game loop in new thread based on checkmate
         ArrayList<GamePiece> addTo;
         public BulletThread(ArrayList<GamePiece> removed){addTo = removed;}
         public void run() {//creates and executes the entire bullet game
             //set field for current bullet game execution
             bulletGame = true;
+
+            //start thread to facilitate music transition
+            Thread music = new Thread(new ClipThread());
+            music.start();
+
+            //instantiate canvas (on which the bullet game will be drawn)
+            Canvas canvas = new Canvas();
+            canvas.setIgnoreRepaint(true);
+            canvas.setSize(600, 400);
 
             //add another piece for every piece to be dodged by player in checkmate according to ID
             ArrayList<GamePiece> newPieces = new ArrayList<>();
@@ -297,21 +345,122 @@ public class ChessGame implements MouseListener, KeyListener{
             //add all new pieces to the recipient arraylist
             addTo.addAll(newPieces);
 
-            //instantiate canvas (on which the bullet game will be drawn)
-            Canvas canvas = new Canvas();
-            canvas.setIgnoreRepaint(true);
-            canvas.setSize(600, 400);
-
             //add canvas to card layout and show it
             overall.add(canvas, "Canvas");
-            ((CardLayout) overall.getLayout()).show(overall, "Canvas");
 
             //get buffer strategy (the canvas will be double buffered)
             canvas.createBufferStrategy(2);
             BufferStrategy buffer = canvas.getBufferStrategy();
 
-            //assorted declarations and initializations for the game loop
+            //set the canvas background to mimic chess board
+            canvas.setBackground(new Color(255,225,175));
+            ((CardLayout) overall.getLayout()).show(overall, "Canvas");
+
+            //begin transition (fade to burnt sienna) over a measure
             Graphics graphics = null;
+            for(int i = 1; i <= 255; i++) {
+                graphics = buffer.getDrawGraphics();
+
+                graphics.setColor(new Color(153,51,0));
+                panel.paintGrid(graphics);
+
+                //fade background progressively to burnt sienna (grid color) through increasing alpha (opacity) values
+                graphics.setColor(new Color(153,51,0,i));
+                graphics.fillRect(0,0,1000,1000);
+                if (!buffer.contentsLost())
+                    buffer.show();
+                try{Thread.sleep(10);}catch(Exception e){}
+            }
+            //change background to white for the more high-contrast design
+            canvas.setBackground(Color.WHITE);
+
+            //fade to black using the same strategy (with a variable-alpha black color over opaque burnt sienna) over a measure
+            for(int i = 1; i <= 255; i++){
+                graphics = buffer.getDrawGraphics();
+
+                graphics.setColor(new Color(153,51,0));
+                graphics.fillRect(0,0,1000,1000);
+                graphics.setColor(new Color(0,0,0,i));
+                graphics.fillRect(0,0,1000,1000);
+                if (!buffer.contentsLost())
+                    buffer.show();
+                try{Thread.sleep(11);}catch(Exception e){}
+            }
+            //fade one side to white the same way over one measure
+            for(int i = 1; i <= 255; i++){
+                graphics = buffer.getDrawGraphics();
+
+                graphics.setColor(new Color(i,i,i));
+                graphics.fillRect(0,0,300,450);
+                if (!buffer.contentsLost())
+                    buffer.show();
+                try{Thread.sleep(11);}catch(Exception e){}
+            }
+
+            //define dialogue per side (to easily reference)
+            String[] leftDialogue = {"White", "Control with WASD", "Pieces: " + String.format("%02d", removedWhite.size()), "Collisions: " + String.format("%02d", whiteCollisions)};
+            String[] rightDialogue = {"Black", "Control with Arrows", "Pieces: " + String.format("%02d", removedBlack.size()), "Collisions: " + String.format("%02d", blackCollisions)};
+
+            //set text antialiasing
+            Graphics2D graph = (Graphics2D) graphics;
+            graph.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+
+            //iterate through and paint the dialogue according to index (in the color of the king), first showing the king pieces in an appropriate location
+            //adds dialogue once per measure
+            for(int i = -1; i < leftDialogue.length; i++){
+                graph.setColor(Color.RED);
+                switch(i){
+                    case 3:
+                        graph.setFont(new Font("Arial", Font.PLAIN, 30));
+                        graph.drawString(rightDialogue[3], 360, 325);
+                        break;
+                    case 2:
+                        graph.setFont(new Font("Arial", Font.PLAIN, 30));
+                        graph.drawString(rightDialogue[2], 385, 275);
+                        break;
+                    case 1:
+                        graph.setFont(new Font("Arial", Font.PLAIN, 30));
+                        graph.drawString(rightDialogue[1], 325, 150);
+                        break;
+                    case 0:
+                        graph.setFont(new Font("Arial", Font.BOLD, 50));
+                        graph.drawString(rightDialogue[0], 390, 75);
+                        break;
+                    case -1:
+                        blackKing.setLocation(new Point(450, 100));
+                        BulletPanel.paintPiece(graph, blackKing, Color.WHITE, Color.RED);
+                        break;
+                }
+
+                graph.setColor(Color.CYAN);
+                switch(i){
+                    case 3:
+                        graph.setFont(new Font("Arial", Font.PLAIN, 30));
+                        graph.drawString(leftDialogue[3], 50, 325);
+                        break;
+                    case 2:
+                        graph.setFont(new Font("Arial", Font.PLAIN, 30));
+                        graph.drawString(leftDialogue[2], 75, 275);
+                        break;
+                    case 1:
+                        graph.setFont(new Font("Arial", Font.BOLD, 30));
+                        graph.drawString(leftDialogue[1], 15, 150);
+                        break;
+                    case 0:
+                        graph.setFont(new Font("Arial", Font.BOLD, 50));
+                        graph.drawString(leftDialogue[0], 70, 75);
+                        break;
+                    case -1:
+                        whiteKing.setLocation(new Point(140, 100));
+                        BulletPanel.paintPiece(graph, whiteKing, Color.BLACK, Color.CYAN);
+                        break;
+                }
+                if (!buffer.contentsLost())
+                    buffer.show();
+                try{Thread.sleep(2791);}catch(Exception e){}
+            }
+
+            //assorted declarations and initializations for the game loop
             double nanoPerTics = 1000000000 / 60;
             final int max = 5;
             double last = System.nanoTime()-nanoPerTics, now = System.nanoTime(), FPSTime=0, FPS=0;
@@ -323,7 +472,7 @@ public class ChessGame implements MouseListener, KeyListener{
                     //increment the time since the last frame rate calculation
                     FPSTime += now - last;
 
-                    //update the game logic, allowing "catch-up" (through multiple iterations of the update) of up to 5 frames
+                    //update the game logic, allowing "catch-up" (through multiple iterations of the update) of up to 5 frames, and adding any collisions to counters
                     updates = 0;
                     while (now - last >= nanoPerTics && updates < max) {
                         bulletPanel.updateGame(60);
@@ -339,22 +488,9 @@ public class ChessGame implements MouseListener, KeyListener{
                         last = now - nanoPerTics;
                     }
 
-                    //add the pieces painting and other parts of bulletPanel-based painting
-                    graphics = buffer.getDrawGraphics();
-                    bulletPanel.paintComponent(graphics);
-
-                    //set the font
-                    graphics.setFont(new Font("Serif", Font.ITALIC, 10));
-
-                    //add the black text for pieces left, collisions, and FPS
-                    graphics.setColor(Color.BLACK);
-                    graphics.drawString("Pieces left: " + String.format("%02d", removedWhite.size()) + ".  Collisions: " + String.format("%02d", whiteCollisions) + ".", 25, 20);
-                    graphics.drawString("FPS: " + String.format("%.1f", FPS), 25, 390);
-
-                    //add the white text for pieces left and collisions
-                    graphics.setColor(Color.WHITE);
-                    graphics.drawString("Pieces left: " + String.format("%02d", removedBlack.size()) + ".  Collisions: " + String.format("%02d", blackCollisions) + ".", 425, 20);
-
+                    //render the game
+                    render(graphics, buffer, FPS);
+                    
                     //after at least a second, update the FPS counter by dividing frames by the time it took to update them (parenthesis to prevent overflow)
                     if (FPSTime > 1000000000) {
                         FPS = frames * (1000000000 / FPSTime);
@@ -369,14 +505,61 @@ public class ChessGame implements MouseListener, KeyListener{
                     //yield to other threads at least once, until it has been at least the specified time between tics
                     do {
                         Thread.yield();
+
                         now = System.nanoTime();
                     } while (now - last < nanoPerTics);
                 } finally {//release the resources
-                    if (graphics != null)
-                        graphics.dispose();
+                    if (graphics != null){}
+                        //graphics.dispose();
                 }
             }
+
+            //designate the winner
+            if(whiteCollisions < blackCollisions || (blackCollisions==whiteCollisions && bulletPanel.black().size()<bulletPanel.white().size()))
+                winner(graphics, buffer, "White", whiteCollisions, blackCollisions, 300, Color.WHITE, Color.BLACK);
+            else if(whiteCollisions > blackCollisions || (blackCollisions==whiteCollisions && bulletPanel.black().size()>bulletPanel.white().size()))
+                winner(graphics, buffer, "Black", blackCollisions, whiteCollisions, 0, Color.BLACK, Color.WHITE);
         }
+    }
+    private static void render(Graphics graphics, BufferStrategy buffer, Double FPS){
+        //add the pieces painting and other parts of bulletPanel-based painting
+        graphics = buffer.getDrawGraphics();
+        bulletPanel.paintComponent(graphics);
+
+        //set the font
+        graphics.setFont(new Font("Serif", Font.ITALIC, 10));
+
+        //add the black text for pieces left, collisions, and FPS
+        graphics.setColor(Color.BLACK);
+        graphics.drawString("Pieces left: " + String.format("%02d", removedWhite.size()) + ".  Collisions: " + String.format("%02d", whiteCollisions) + ".", 25, 20);
+        graphics.drawString("FPS: " + String.format("%.1f", FPS), 25, 390);
+
+        //add the white text for pieces left and collisions
+        graphics.setColor(Color.WHITE);
+        graphics.drawString("Pieces left: " + String.format("%02d", removedBlack.size()) + ".  Collisions: " + String.format("%02d", blackCollisions) + ".", 425, 20);
+    }
+    private static void winner(Graphics graphics, BufferStrategy buffer, String winnerName, int winnerCollisions, int loserCollisions, int leftEdge, Color box, Color text){
+        //fade losing side to color of winning side
+        for(int i = 1; i <= 255; i++){
+            render(graphics, buffer, 60.0);
+
+            graphics.setColor(new Color(box.getRed(), box.getGreen(), box.getBlue(), i));
+            graphics.fillRect(leftEdge, 0, 300, 500);
+
+            if (!buffer.contentsLost())
+                buffer.show();
+        }
+
+        //paint the text for the winner, and show
+        graphics.setColor(text);
+        graphics.setFont(new Font("Arial", Font.BOLD, 75));
+        graphics.drawString(winnerName, leftEdge+40, 80);
+        graphics.drawString("Won.", leftEdge+40, 160);
+        graphics.setFont(new Font("Arial", Font.BOLD, 50));
+        graphics.drawString("(" + winnerCollisions + "-" + loserCollisions + ")", leftEdge+50, 360);
+
+        if (!buffer.contentsLost())
+            buffer.show();
     }
 
     //return the number of collisions between the king and foe pieces, randomizing the locations of any collided particles
@@ -450,8 +633,14 @@ public class ChessGame implements MouseListener, KeyListener{
     }
     //if an M is typed, invert the mute status (music->silence and vice versa)
     public void keyTyped(KeyEvent e){
-        if (e.getKeyChar() == 'm')
-            panel.mute();
+        if (e.getKeyChar() == 'm') {
+            if (musicOn)
+                clip.stop();
+            else
+                clip.loop(99999);
+            musicOn = !musicOn;
+        }
+
     }
 
     //method declarations for unused listener functions

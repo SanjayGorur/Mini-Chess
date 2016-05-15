@@ -23,16 +23,13 @@ public class ChessGame implements MouseListener, KeyListener{
 
     public static void main(String[] args){
         //loop the initial music (Mozart Rondo Alla Turca)
-        try
-        {
+        try{
             clip = AudioSystem.getClip();
             clip.open(AudioSystem.getAudioInputStream(new File("Rondo.wav")));
             clip.loop(Clip.LOOP_CONTINUOUSLY);
             musicOn = true;
-        }
-        catch (Exception exc)
-        {
-            System.out.println("Sound error (likely a mishandled wav file).");
+        }catch (Exception e){
+       	    e.printStackTrace();
         }
 
         //make window
@@ -58,8 +55,8 @@ public class ChessGame implements MouseListener, KeyListener{
         black.add(new Knight(new Point(6,0)));
         black.add(new Bishop(new Point(2,0)));
         black.add(new Bishop(new Point(5,0)));
-        black.add(new Queen(new Point(4,0)));
-        black.add(new King(new Point(3,0)));
+        black.add(new Queen(new Point(3,0)));
+        black.add(new King(new Point(4,0)));
 
         //instantiate white pieces
         white.add(new Rook(new Point(0,7)));
@@ -68,8 +65,8 @@ public class ChessGame implements MouseListener, KeyListener{
         white.add(new Knight(new Point(6,7)));
         white.add(new Bishop(new Point(2,7)));
         white.add(new Bishop(new Point(5,7)));
-        white.add(new Queen(new Point(4,7)));
-        white.add(new King(new Point(3,7)));
+        white.add(new Queen(new Point(3,7)));
+        white.add(new King(new Point(4,7)));
 
         //instantiate panels
         panel = new ChessPanel(black, white, removedBlack, removedWhite);
@@ -301,16 +298,7 @@ public class ChessGame implements MouseListener, KeyListener{
             //set field for current bullet game execution
             bulletGame = true;
 
-            //start thread to facilitate music transition
-            Thread music = new Thread(new ClipThread());
-            music.start();
-
-            //instantiate canvas (on which the bullet game will be drawn)
-            Canvas canvas = new Canvas();
-            canvas.setIgnoreRepaint(true);
-            canvas.setSize(600, 400);
-
-            //add another piece for every piece to be dodged by player in checkmate according to ID
+	    //add another piece for every piece to be dodged by player in checkmate according to ID
             ArrayList<GamePiece> newPieces = new ArrayList<>();
             for (GamePiece p : addTo)
                 switch (p.getID()) {
@@ -345,37 +333,50 @@ public class ChessGame implements MouseListener, KeyListener{
             //add all new pieces to the recipient arraylist
             addTo.addAll(newPieces);
 
+            //instantiate canvas (on which the bullet game will be drawn)
+            Canvas canvas = new Canvas();
+            canvas.setIgnoreRepaint(true);
+            canvas.setSize(600, 400);
+
             //add canvas to card layout and show it
             overall.add(canvas, "Canvas");
-
-            //get buffer strategy (the canvas will be double buffered)
+            
+	    //get buffer strategy (the canvas will be double buffered)
             canvas.createBufferStrategy(2);
             BufferStrategy buffer = canvas.getBufferStrategy();
 
-            //set the canvas background to mimic chess board
-            canvas.setBackground(new Color(255,225,175));
-            ((CardLayout) overall.getLayout()).show(overall, "Canvas");
-
-            //begin transition (fade to burnt sienna) over a measure
-            Graphics graphics = null;
-            for(int i = 1; i <= 255; i++) {
+            
+            //start thread to facilitate music transition
+	    Thread music = new Thread(new ClipThread());
+            music.start();
+	    
+	    //set the canvas background to mimic chess board, paint initial grid, and show the canvas
+            canvas.setBackground(Color.WHITE);
+            Graphics graphics = buffer.getDrawGraphics();
+	    graphics.setColor(new Color(255,225,175));
+	    graphics.fillRect(0,0,1000,1000);
+	    panel.paintAll(graphics);
+	    buffer.show();
+	    ((CardLayout) overall.getLayout()).show(overall, "Canvas");
+            
+	    long startTime = System.nanoTime();
+            //begin transition (fade to burnt sienna) over a measure, using a buffer (sleeping the time between when it should be and the current time in order to avoid lag ruining transition time)
+            for(double i = 1; i <= 255; i+=255.0/100) {
                 graphics = buffer.getDrawGraphics();
-
-                graphics.setColor(new Color(153,51,0));
-                panel.paintGrid(graphics);
+		graphics.setColor(new Color(255,225,175));
+		graphics.fillRect(0,0,1000,1000);
+		panel.paintAll(graphics);
 
                 //fade background progressively to burnt sienna (grid color) through increasing alpha (opacity) values
-                graphics.setColor(new Color(153,51,0,i));
-                graphics.fillRect(0,0,1000,1000);
+                graphics.setColor(new Color(153,51,0,(int) i));
+		graphics.fillRect(0,0,1000,1000);
                 if (!buffer.contentsLost())
                     buffer.show();
-                try{Thread.sleep(10);}catch(Exception e){}
+                try{Thread.sleep((long) ((startTime+285000000L/255.0*i - System.nanoTime())/1000000.0));}catch(Exception e){}
             }
-            //change background to white for the more high-contrast design
-            canvas.setBackground(Color.WHITE);
 
-            //fade to black using the same strategy (with a variable-alpha black color over opaque burnt sienna) over a measure
-            for(int i = 1; i <= 255; i++){
+            //fade to black using the same strategy (with a variable-alpha black color over opaque burnt sienna) over a measure, further buffered to mitigate any leftover lag from the first loop
+	    for(int i = 1; i <= 255; i++){
                 graphics = buffer.getDrawGraphics();
 
                 graphics.setColor(new Color(153,51,0));
@@ -384,9 +385,9 @@ public class ChessGame implements MouseListener, KeyListener{
                 graphics.fillRect(0,0,1000,1000);
                 if (!buffer.contentsLost())
                     buffer.show();
-                try{Thread.sleep(11);}catch(Exception e){}
+                try{Thread.sleep((long) ((startTime+2850000000L+2971000000L/255.0*i - System.nanoTime())/1000000.0));}catch(Exception e){}
             }
-            //fade one side to white the same way over one measure
+            //fade one side to white the same way over one measure, unbuffered due to the low lag potential
             for(int i = 1; i <= 255; i++){
                 graphics = buffer.getDrawGraphics();
 
@@ -394,7 +395,7 @@ public class ChessGame implements MouseListener, KeyListener{
                 graphics.fillRect(0,0,300,450);
                 if (!buffer.contentsLost())
                     buffer.show();
-                try{Thread.sleep(11);}catch(Exception e){}
+                try{Thread.sleep(10);}catch(Exception e){}
             }
 
             //define dialogue per side (to easily reference)
@@ -412,7 +413,7 @@ public class ChessGame implements MouseListener, KeyListener{
                 switch(i){
                     case 3:
                         graph.setFont(new Font("Arial", Font.PLAIN, 30));
-                        graph.drawString(rightDialogue[3], 360, 325);
+                        graph.drawString(rightDialogue[3], 365, 325);
                         break;
                     case 2:
                         graph.setFont(new Font("Arial", Font.PLAIN, 30));
@@ -436,7 +437,7 @@ public class ChessGame implements MouseListener, KeyListener{
                 switch(i){
                     case 3:
                         graph.setFont(new Font("Arial", Font.PLAIN, 30));
-                        graph.drawString(leftDialogue[3], 50, 325);
+                        graph.drawString(leftDialogue[3], 55, 325);
                         break;
                     case 2:
                         graph.setFont(new Font("Arial", Font.PLAIN, 30));
@@ -558,6 +559,7 @@ public class ChessGame implements MouseListener, KeyListener{
         graphics.setFont(new Font("Arial", Font.BOLD, 50));
         graphics.drawString("(" + winnerCollisions + "-" + loserCollisions + ")", leftEdge+50, 360);
 
+	//show changes
         if (!buffer.contentsLost())
             buffer.show();
     }
@@ -637,7 +639,7 @@ public class ChessGame implements MouseListener, KeyListener{
             if (musicOn)
                 clip.stop();
             else
-                clip.loop(99999);
+                clip.loop(Clip.LOOP_CONTINUOUSLY);
             musicOn = !musicOn;
         }
 

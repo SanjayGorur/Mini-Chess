@@ -20,10 +20,10 @@ public class ChessPanel extends JPanel {
     //paints black squares of grid
     public void paintGrid(Graphics g){
         for (int i = 0; i < 400; i += 50)
-            for (int j = i%100; j < 400; j += 100)
+            for (int j = (i+50)%100; j < 400; j += 100)
                 g.fillRect(i, j, 50, 50);
     }
-
+    //paints individual pieces
     private void paintPiece(Graphics g, GamePiece p, Point loc, Color out, Color fill){
         g.setColor(fill);
         g.fillOval(loc.getX(), loc.getY(), 50, 50);
@@ -41,6 +41,7 @@ public class ChessPanel extends JPanel {
             paintPiece(g, p, loc, out, fill);
         }
     }
+    //paint removed pieces on the side
     private void paintRemoved(Graphics g, int start, int inc, ArrayList<GamePiece> removed, Color out, Color fill) {
         Point loc = new Point(400, start);
         for (GamePiece p : removed) {
@@ -81,9 +82,8 @@ public class ChessPanel extends JPanel {
         }
     }
 
-    public void paintComponent(Graphics gr) {
-        super.paintComponent(gr);
-
+    //paint the board (separated from paintComponent to be callable w/o checkmate)
+    public void paintAll(Graphics gr){
         //cast to Graphics2D and set anti-aliasing for text and shapes
         Graphics2D g = (Graphics2D) gr;
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -118,7 +118,12 @@ public class ChessPanel extends JPanel {
         highlight(g, activeColor, active);
         highlight(g, Color.RED, ChessGame.inCheck(black, white));
         highlight(g, Color.RED, ChessGame.inCheck(white, black));
+    }
 
+    public void paintComponent(Graphics gr) {
+        super.paintComponent(gr);
+
+	paintAll(gr);
 
         //write checkmate if the game has come to an end.
         ChessGame.checkmate();

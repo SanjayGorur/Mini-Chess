@@ -5,7 +5,7 @@ import java.util.ArrayList;
 public class BulletPanel extends JPanel{
     //fields for the unadded black/white pieces, added black/white, and current time in milliseconds
     private ArrayList<GamePiece> blackRemaining, whiteRemaining, black, white;
-    private int curTime;
+    private int curTime, timeSinceTransfer;
 
     //constructor, takes arguments for the black, white arraylists and corresponding kings
     public BulletPanel(ArrayList<GamePiece> bl, ArrayList<GamePiece> wh, GamePiece blk, GamePiece whk){
@@ -19,7 +19,9 @@ public class BulletPanel extends JPanel{
         white = new ArrayList<>();
         white.add(whk);
 
+	//set background and time since trasfer of pieces
         setBackground(Color.WHITE);
+    	timeSinceTransfer = 0;
     }
 
     //paint a particular piece as an oval according to its width and height fields
@@ -60,18 +62,20 @@ public class BulletPanel extends JPanel{
     }
 
     //update the game logic
-    public void updateGame(int FPS){
+    public void updateGame(int FPS, boolean suddenDeath){
         //update the time so that the target FPS corresponds to one second (curTime/1000)
         curTime+=1000/FPS;
+        timeSinceTransfer+=1000/FPS;
 
         //move pieces if they are running
-        if(whiteRunning())
+        if(suddenDeath || whiteTime()>0)
             movePieces(white, 25, 265, 25, 365);
-        if(blackRunning())
+        if(suddenDeath || blackTime()>0)
             movePieces(black, 325, 565, 25, 365);
 
-        //transfer pieces every half second
-        if(curTime%500 == 0){
+        //transfer pieces every 1/10 second
+        if(timeSinceTransfer >= 100){
+            timeSinceTransfer = 0;
             transferPieces(blackRemaining, black, 325, 565, 25, 365);
             transferPieces(whiteRemaining, white, 20, 265, 25, 365);
         }
@@ -102,15 +106,27 @@ public class BulletPanel extends JPanel{
     //transfer in any pieces according to the current time and their capture time by a 1:1 ratio
     private void transferPieces(ArrayList<GamePiece> rem, ArrayList<GamePiece> pcs, int xmin, int xmax, int ymin, int ymax){
         for(int i = 0; i < rem.size(); i++)
-            if(rem.get(i).getTime() <= curTime/1000){
+            if(rem.get(i).getTime() <= curTime/100){
                 rem.get(i).randomize(xmin, xmax, ymin, ymax);
                 pcs.add(rem.remove(i));
             }
     }
 
-    //accessor methods for pieces and whether they are running
+    //accessor methods for pieces and time left
     public ArrayList<GamePiece> black(){return black;}
     public ArrayList<GamePiece> white(){return white;}
-    public boolean blackRunning(){return blackRemaining.size() > 0 || curTime/1000 < 2*black.get(black.size()-1).getTime();}
-    public boolean whiteRunning(){return whiteRemaining.size() > 0 || curTime/1000 < 2*white.get(white.size()-1).getTime();}
+    public int timeLeft(ArrayList<GamePiece> rem, ArrayList<GamePiece> pcs){
+        int max = 0;
+        for(GamePiece p: rem)
+            if(p.getTime() > max)
+                max = p.getTime();
+
+        for(GamePiece p: pcs)
+            if(p.getTime() > max)
+                max = p.getTime();
+
+        return 120000+max*100-curTime;
+    }
+    public int blackTime(){return timeLeft(blackRemaining, black);}
+    public int whiteTime(){return timeLeft(whiteRemaining, black);}
 }

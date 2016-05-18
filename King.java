@@ -1,7 +1,7 @@
 import java.util.ArrayList;
 
 public class King extends GamePiece{
-    private int incX, incY;
+    private int left, right, up, down;
 
     public ArrayList<Point> getMoves(ArrayList<GamePiece> friendPieces, ArrayList<GamePiece> foePieces){
         ArrayList<Point> moves = new ArrayList<>();
@@ -55,14 +55,16 @@ public class King extends GamePiece{
     //constructor and ID definition
     public King(Point p){
         super(p);
-        incX = incY = 0;
+        left = right = up = down = 0;
     }
     //various methods for class identity, as well as methods to set increment (velocity) horizontally and vertically
     public String getID(){ return "K";}
     public int offSet(){return 7;}
-    public void move(){getLocation().incX(incX).incY(incY);}
-    public void setIncX(int x){incX = x;}
-    public void setIncY(int y){incY = y;}
+    public void move(){getLocation().incX(right-left).incY(down-up);}
+    public void setLeft(int x){left = x;}
+    public void setRight(int x){right = x;}
+    public void setUp(int x){up = x;}
+    public void setDown(int x){down = x;}
     public int getWidth(){return 10;}
     public int getHeight(){return 10;}
 }

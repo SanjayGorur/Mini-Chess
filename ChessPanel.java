@@ -82,13 +82,15 @@ public class ChessPanel extends JPanel {
         }
     }
 
+    //format time to include seconds and minutes
+    private String formatTime(int seconds){ return seconds/60 + ":" + String.format("%02d", seconds%60);}
+
     //paint the board (separated from paintComponent to be callable w/o checkmate)
     public void paintAll(Graphics gr){
         //cast to Graphics2D and set anti-aliasing for text and shapes
         Graphics2D g = (Graphics2D) gr;
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-
 
         //paint grid as custom color (burnt sienna)
         g.setColor(new Color(153,51,0));
@@ -101,6 +103,12 @@ public class ChessPanel extends JPanel {
             for(Point p: moves)
                 g.fillRect(p.getX()*50, p.getY()*50, 50, 50);
         }
+        
+        //draw times
+        g.setFont(new Font("Arial", Font.ITALIC, 15));
+        g.setColor(new Color(153,51,0));
+        g.drawString("White: " + formatTime(ChessGame.getWhiteTime()), 420, 207);
+        g.drawString("Black: " + formatTime(ChessGame.getBlackTime()), 510, 207);
 
         //set font for pieces
         g.setFont(new Font("Arial", Font.BOLD, 50));
@@ -123,7 +131,7 @@ public class ChessPanel extends JPanel {
     public void paintComponent(Graphics gr) {
         super.paintComponent(gr);
 
-	paintAll(gr);
+    	paintAll(gr);
 
         //write checkmate if the game has come to an end.
         ChessGame.checkmate();

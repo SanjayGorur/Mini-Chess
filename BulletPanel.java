@@ -125,7 +125,7 @@ public class BulletPanel extends JPanel{
             if(p.getTime() > max)
                 max = p.getTime();
 
-        return 120000+max*100-curTime;
+        return 60000+max*100-curTime;
     }
     public int blackTime(){return timeLeft(blackRemaining, black);}
     public int whiteTime(){return timeLeft(whiteRemaining, black);}

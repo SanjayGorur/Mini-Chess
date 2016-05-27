@@ -128,6 +128,7 @@ public class ChessPanel extends JPanel {
         highlight(g, Color.RED, ChessGame.inCheck(white, black));
     }
 
+    //called on repaint(), method used primarily in showing the panel
     public void paintComponent(Graphics gr) {
         super.paintComponent(gr);
 

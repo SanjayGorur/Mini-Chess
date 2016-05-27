@@ -10,8 +10,8 @@ import java.io.*;
 import javax.sound.sampled.*;
 
 public class ChessGame implements MouseListener, KeyListener{
-    //Fields for the pieces, panels, whether it's white's turn, the bullet game, or music is playing, the kings, frame and music player
-    private static ArrayList<GamePiece> black, white, removedBlack, removedWhite;
+    //declarations for assorted fields used throughout the game
+    private static ArrayList<GamePiece> black, white, removedBlack, removedWhite, undoBlack, undoWhite;
     private static JPanel overall;
     private static ChessPanel panel;
     private static BulletPanel bulletPanel;
@@ -26,6 +26,7 @@ public class ChessGame implements MouseListener, KeyListener{
     public static int getWhiteTime(){ return whiteTime;}
     public static int getBlackTime(){ return blackTime;}
 
+    //called on execution of the gaeme
     public static void main(String[] args){
         //loop the initial music (Mozart Rondo Alla Turca)
         try{
@@ -38,7 +39,7 @@ public class ChessGame implements MouseListener, KeyListener{
         }
 
         //make window
-        frame = new JFrame("Ugly Chess");
+        frame = new JFrame("Mini-Chess");
         frame.setSize(new Dimension(605,420));
 
         //define lists of black/white pieces
@@ -72,6 +73,16 @@ public class ChessGame implements MouseListener, KeyListener{
         white.add(new Bishop(new Point(5,7)));
         white.add(new Queen(new Point(3,7)));
         white.add(new King(new Point(4,7)));
+            
+        //find black king piece, set it to field
+        for (GamePiece p : black)
+            if (p.getID().equals("K"))
+                blackKing = (King) p;
+
+        //find white king piece, set it to field
+        for (GamePiece p : white)
+            if (p.getID().equals("K"))
+                whiteKing = (King) p;
 
         //instantiate panels
         panel = new ChessPanel(black, white, removedBlack, removedWhite);
@@ -116,6 +127,7 @@ public class ChessGame implements MouseListener, KeyListener{
                 return piece;
         return null;
     }
+
     //event on mousePress
     public void mousePressed(MouseEvent e){
         //get point on chess grid and active piece (highlighted)
@@ -149,11 +161,18 @@ public class ChessGame implements MouseListener, KeyListener{
             for(Point p: panel.getMoves())
                 hasPoint = hasPoint || p.equals(gridPoint);
 
+            
             //if move is legal
             if(hasPoint){
                 //move contributes to stalemate count if no pawn is moved and no pieces are captured
                 boolean staleMove = true;
                 
+                //set pieces for undo to deep type/location copies of their counterparts, adding kings which are unnaded in doublePieces()
+                undoWhite = doublePieces(white);
+                undoWhite.add(whiteKing);
+                undoBlack = doublePieces(black);
+                undoBlack.add(blackKing);
+
                 //find the foe on that move (if any) and remove it, setting time of capture
                 for (int x = 0; x < foe.size(); x++)
                     if (foe.get(x).getLocation().equals(gridPoint)) {
@@ -236,6 +255,7 @@ public class ChessGame implements MouseListener, KeyListener{
         //return all potential moves
         return moves;
     }
+
     //Returns king if the "friend" is in check, null otherwise
     public static GamePiece inCheck(ArrayList<GamePiece> friendPieces, ArrayList<GamePiece> foePieces){
         ArrayList<Point> enemyMoves = new ArrayList<>();
@@ -307,8 +327,11 @@ public class ChessGame implements MouseListener, KeyListener{
             t.start();
         }
     }
+
     //class to transition music in its own thread (to ensure smooth playback regardless of any lag)
-    private static class ClipThread implements Runnable{
+    //music is taken from Stompbox, by the Qemists (Spor remix)
+    private static class ClipThread implements Runnable, LineListener{
+        private Clip temp;
         public void run(){
             try {
                 //leave a 1/10 second gap then play the transition music
@@ -318,17 +341,23 @@ public class ChessGame implements MouseListener, KeyListener{
                 clip.open(AudioSystem.getAudioInputStream(new File("Transition.wav")));
                 if(musicOn)
                     clip.start();
+                
+                //instantiate looped music as its own clip to ease transition to second part
+                temp = AudioSystem.getClip();
+                temp.open(AudioSystem.getAudioInputStream(new File("Stompbox.wav")));
 
-                //after a predetermined length of the clip, loop the main music indefinitely (The Qemists - Stompbox (Spor Remix))
-                Thread.sleep(22200);
-
-                clip = AudioSystem.getClip();
-                clip.open(AudioSystem.getAudioInputStream(new File("Stompbox.wav")));
-                if(musicOn)
-                    clip.loop(Clip.LOOP_CONTINUOUSLY);
-            }catch(Exception e){
-                e.printStackTrace();
-            }
+                clip.addLineListener(this);
+            }catch(Exception e){e.printStackTrace();}
+        }
+        //when the transition music stops, immidiately play the looped section and set clip to the previously temporary object
+        public void update(LineEvent event){
+            try{
+                if(event.getType() == LineEvent.Type.STOP){ 
+                    if(musicOn)
+                        temp.loop(Clip.LOOP_CONTINUOUSLY);
+                    clip = temp;
+                }
+            }catch(Exception e){e.printStackTrace();}
         }
     }
    
@@ -338,19 +367,19 @@ public class ChessGame implements MouseListener, KeyListener{
         for (GamePiece p : original)
             switch (p.getID()) {
                 case "P":
-                    newPieces.add(new Pawn(new Point(0, 0), true).setTime(p.getTime()));
+                    newPieces.add(new Pawn(new Point(p.getLocation()), true).setTime(p.getTime()));
                     break;
                 case "R":
-                    newPieces.add(new Rook(new Point(0, 0)).setTime(p.getTime()));
+                    newPieces.add(new Rook(new Point(p.getLocation())).setTime(p.getTime()));
                     break;
                 case "B":
-                    newPieces.add(new Bishop(new Point(0, 0)).setTime(p.getTime()));
+                    newPieces.add(new Bishop(new Point(p.getLocation())).setTime(p.getTime()));
                     break;
                 case "N":
-                    newPieces.add(new Knight(new Point(0, 0)).setTime(p.getTime()));
+                    newPieces.add(new Knight(new Point(p.getLocation())).setTime(p.getTime()));
                     break;
                 case "Q":
-                    newPieces.add(new Queen(new Point(0, 0)).setTime(p.getTime()));
+                    newPieces.add(new Queen(new Point(p.getLocation())).setTime(p.getTime()));
                     break;
             }
 
@@ -362,23 +391,41 @@ public class ChessGame implements MouseListener, KeyListener{
             return "0.00.000";
 
         return seconds/60000 + "." + String.format("%02d", (seconds/1000)%60) + "." + String.format("%03d", seconds%1000);
-    } 
+    }
+
+    //text for stalemate
+    private static void chessEndText(Graphics graphics, ArrayList<GamePiece> addTo){
+        graphics.setFont(new Font("Arial", Font.BOLD, 50));
+        graphics.setColor(new Color(235,177,133,225));
+        if(addTo.size() == 0){
+            graphics.fillRect(90, 170, 270, 60);
+            graphics.setColor(new Color(153,51,0));
+            graphics.drawRect(90, 170, 270, 60);
+            graphics.setColor(new Color(255,0,0));
+            graphics.drawString("Stalemate.", 100, 220);
+        }
+        else if(whiteTurn){
+            graphics.fillRect(40, 170, 520, 60);
+            graphics.setColor(new Color(153,51,0));
+            graphics.drawRect(40, 170, 520, 60);
+            graphics.setColor(new Color(255,0,0));
+            graphics.drawString("Checkmate on White.", 50, 220);
+        }
+        else{
+            graphics.fillRect(40, 170, 520, 60);
+            graphics.setColor(new Color(153,51,0));
+            graphics.drawRect(40, 170, 520, 60);
+            graphics.setColor(new Color(255,0,0));
+            graphics.drawString("Checkmate on Black.", 50, 220);
+        }
+    }
+
     private static class BulletThread implements Runnable{//calls game loop in new thread based on checkmate
         ArrayList<GamePiece> addTo;
         public BulletThread(ArrayList<GamePiece> removed){addTo = removed;}
         public void run() {//creates and executes the entire bullet game
             //set field for current bullet game execution
             bulletGame = true;
-
-            //find black king piece, set it to field
-            for (GamePiece p : black)
-                if (p.getID().equals("K"))
-                    blackKing = (King) p;
-
-            //find white king piece, set it to field
-            for (GamePiece p : white)
-                if (p.getID().equals("K"))
-                    whiteKing = (King) p;
 
             //add all new pieces to the recipient arraylist
             addTo.addAll(doublePieces(addTo));
@@ -394,21 +441,26 @@ public class ChessGame implements MouseListener, KeyListener{
 	        //get buffer strategy (the canvas will be double buffered)
             canvas.createBufferStrategy(2);
             BufferStrategy buffer = canvas.getBufferStrategy();
-            
-            //start thread to facilitate music transition
-	        Thread music = new Thread(new ClipThread());
-            music.start();
 	    
+            ((CardLayout) overall.getLayout()).show(overall, "Canvas");
 	        //set the canvas background to mimic chess board, paint initial grid, and show the canvas
             canvas.setBackground(Color.WHITE);
             Graphics graphics = buffer.getDrawGraphics();
             graphics.setColor(new Color(255,225,175));
             graphics.fillRect(0,0,1000,1000);
             panel.paintAll(graphics);
+            
+            chessEndText(graphics, addTo);
+
             if(!buffer.contentsLost())
                 buffer.show();
-            ((CardLayout) overall.getLayout()).show(overall, "Canvas");
                 
+            try{Thread.sleep(5000);}catch(Exception e){e.printStackTrace();}
+            
+            //start thread to facilitate music transition
+	        Thread music = new Thread(new ClipThread());
+            music.start();
+
             long startTime = System.nanoTime();
             //begin transition (fade to burnt sienna) over a measure, using a buffer (sleeping the time between when it should be and the current time in order to avoid lag ruining transition time)
             for(double i = 1; i <= 255; i+=255.0/100) {
@@ -416,6 +468,8 @@ public class ChessGame implements MouseListener, KeyListener{
                 graphics.setColor(new Color(255,225,175));
                 graphics.fillRect(0,0,1000,1000);
                 panel.paintAll(graphics);
+
+                chessEndText(graphics, addTo);
 
                 //fade background progressively to burnt sienna (grid color) through increasing alpha (opacity) values
                 graphics.setColor(new Color(153,51,0,(int) i));
@@ -521,94 +575,92 @@ public class ChessGame implements MouseListener, KeyListener{
 
             //game loop; updates the logic and renders the game as long as one side is still running, according to a particular game speed, limiting frame rate
             while (running || suddenDeath){
-                try {
-                    //increment the time since the last frame rate calculation
-                    FPSTime += now - last;
+                //increment the time since the last frame rate calculation
+                FPSTime += now - last;
 
-                    if(suddenDeath)
-                        whiteTimeLeft = blackTimeLeft = 10000 - (int) ((now-lastDub)/1000000);
-                    else{
-                        whiteTimeLeft = bulletPanel.whiteTime();
-                        blackTimeLeft = bulletPanel.blackTime();
-                    }
+                //update the timers, labeling time to the end normally, or time to doubling in sudden death
+                if(suddenDeath)
+                    whiteTimeLeft = blackTimeLeft = 10000 - (int) ((now-lastDub)/1000000);
+                else{
+                    whiteTimeLeft = bulletPanel.whiteTime();
+                    blackTimeLeft = bulletPanel.blackTime();
+                }
 
-                    //update the game logic, allowing "catch-up" (through multiple iterations of the update) of up to 5 frames, and adding any collisions to counters
-                    updates = 0;
-                    while (now - last >= nanoPerTics && updates < max) {
-                        bulletPanel.updateGame(60, suddenDeath);
-                        if (bulletPanel.white().size() > 1 && (suddenDeath || whiteTime>0))
-                            whiteCollisions += collide(whiteKing, bulletPanel.white(), 25, 265, 25, 365);
-                        if (bulletPanel.black().size() > 1 && (suddenDeath || blackTime>0))
-                            blackCollisions += collide(blackKing, bulletPanel.black(), 325, 565, 25, 365);
-                        last += nanoPerTics;
-                        updates++;
-                        frames++;
-                    }
-                    if (now - last > nanoPerTics) {
-                        last = now - nanoPerTics;
-                    }
+                //update the game logic, allowing "catch-up" (through multiple iterations of the update) of up to 5 frames, and adding any collisions to counters
+                updates = 0;
+                while (now - last >= nanoPerTics && updates < max) {
+                    bulletPanel.updateGame(60, suddenDeath);
+                    if (bulletPanel.white().size() > 1 && (suddenDeath || whiteTime>0))
+                        whiteCollisions += collide(whiteKing, bulletPanel.white(), 25, 265, 25, 365);
+                    if (bulletPanel.black().size() > 1 && (suddenDeath || blackTime>0))
+                        blackCollisions += collide(blackKing, bulletPanel.black(), 325, 565, 25, 365);
+                    last += nanoPerTics;
+                    updates++;
+                    frames++;
+                }
+                if (now - last > nanoPerTics) {
+                    last = now - nanoPerTics;
+                }
 
-                    //render the game
-                    render(graphics, buffer, FPS, whiteTimeLeft, blackTimeLeft);
-                    
-                    //after at least a second, update the FPS counter by dividing frames by the time it took to update them (parenthesis to prevent overflow)
-                    if (FPSTime > 1000000000) {
-                        FPS = frames * (1000000000 / FPSTime);
-                        FPSTime = 0;
-                        frames = 0;
-                    }
+                //render the game
+                render(graphics, buffer, FPS, whiteTimeLeft, blackTimeLeft);
+                
+                //after at least a second, update the FPS counter by dividing frames by the time it took to update them (parenthesis to prevent overflow)
+                if (FPSTime > 1000000000) {
+                    FPS = frames * (1000000000 / FPSTime);
+                    FPSTime = 0;
+                    frames = 0;
+                }
 
-                    //show the changes
-                    if (!buffer.contentsLost())
-                        buffer.show();
+                //show the changes
+                if (!buffer.contentsLost())
+                    buffer.show();
 
-                    //check to see if the loop should continue running based on if any time is left
-                    running = running && (whiteTimeLeft>0 || blackTimeLeft>0);
-                    suddenDeath = suddenDeath && whiteCollisions == blackCollisions;
-                    
-                    if(!running && !suddenDeath && whiteCollisions == blackCollisions){
-                        suddenDeath = true;
-                        clip.stop();
-                        for(int i = 0; i < 30; i++){
-                            render(graphics, buffer, FPS, whiteTime, blackTime);
-                            if(i%2 == 0){
-                                graphics.setColor(new Color((int) (Math.random()*255),(int) (Math.random()*255), (int) (Math.random()*255)));
-                                graphics.setFont(new Font("Arial", Font.BOLD, 100));
-                                if(i%4 == 0)
-                                    graphics.drawString("SUDDEN", 75, 200);
-                                else
-                                    graphics.drawString("DEATH", 125, 200);
-                            }
-                            if(!buffer.contentsLost())
-                                buffer.show();
-                            try{Thread.sleep(100);}catch(Exception e){e.printStackTrace();}
+                //check to see if the loop should continue running based on if any time is left
+                running = running && (whiteTimeLeft>0 || blackTimeLeft>0);
+                suddenDeath = suddenDeath && whiteCollisions == blackCollisions;
+                
+                if(!running && !suddenDeath && whiteCollisions == blackCollisions){
+                    suddenDeath = true;
+                    clip.stop();
+                    for(int i = 0; i < 30; i++){
+                        render(graphics, buffer, FPS, whiteTime, blackTime);
+                        if(i%2 == 0){
+                            graphics.setColor(new Color((int) (Math.random()*255),(int) (Math.random()*255), (int) (Math.random()*255)));
+                            graphics.setFont(new Font("Arial", Font.BOLD, 100));
+                            if(i%4 == 0)
+                                graphics.drawString("SUDDEN", 75, 200);
+                            else
+                                graphics.drawString("DEATH", 125, 200);
                         }
-                        if(musicOn)
-                            clip.loop(Clip.LOOP_CONTINUOUSLY);
+                        if(!buffer.contentsLost())
+                            buffer.show();
+                        try{Thread.sleep(100);}catch(Exception e){e.printStackTrace();}
                     }
-                    //double if it's been the necessary time
-                    if(suddenDeath && now-lastDub > timePerDub){
-                        ArrayList<GamePiece> newBlack = doublePieces(bulletPanel.black());
-                        ArrayList<GamePiece> newWhite = doublePieces(bulletPanel.white());
+                    if(musicOn)
+                        clip.loop(Clip.LOOP_CONTINUOUSLY);
+                }
+                //double if it's been the necessary time
+                if(suddenDeath && now-lastDub > timePerDub){
+                    ArrayList<GamePiece> newBlack = doublePieces(bulletPanel.black());
+                    ArrayList<GamePiece> newWhite = doublePieces(bulletPanel.white());
 
-                        for(GamePiece p: newBlack)
-                            p.randomize(325,565,25,365);
-                        for(GamePiece p: newWhite)
-                            p.randomize(20,265,25,365);
+                    for(GamePiece p: newBlack)
+                        p.randomize(325,565,25,365);
+                    for(GamePiece p: newWhite)
+                        p.randomize(20,265,25,365);
 
-                        bulletPanel.black().addAll(newBlack);
-                        bulletPanel.white().addAll(newWhite);
-                        lastDub = System.nanoTime();;
-                    }
+                    bulletPanel.black().addAll(newBlack);
+                    bulletPanel.white().addAll(newWhite);
+                    lastDub = System.nanoTime();;
+                }
 
-                    //yield to other threads at least once, until it has been at least the specified time between tics
-                    do {
-                        Thread.yield();
-                        now = System.nanoTime();
-                    } while (now - last < nanoPerTics);
-                } finally {}
+                //yield to other threads at least once, until it has been at least the specified time between tics
+                do {
+                    Thread.yield();
+                    now = System.nanoTime();
+                } while (now - last < nanoPerTics);
             }
-
             //designate the winner
             if(whiteCollisions < blackCollisions)
                 winner(graphics, buffer, "White", whiteTime, bulletPanel.white(), whiteCollisions, blackCollisions, 300, Color.WHITE, Color.BLACK);
@@ -675,10 +727,10 @@ public class ChessGame implements MouseListener, KeyListener{
         graphics.setFont(new Font("Arial", Font.PLAIN, 25));
         graphics.drawString("Score: " + winnerCollisions + "-" + loserCollisions, leftEdge+20, 110);
         graphics.drawString("Total Pieces: " + (pieces.size()-1), leftEdge+20, 165);
-        graphics.drawString("Pawns: " + pawn, leftEdge+20, 195);
-        graphics.drawString("Knights: " + knight, leftEdge+20, 225);
-        graphics.drawString("Bishops: " + bishop, leftEdge+20, 255);
-        graphics.drawString("Rooks: " + rook, leftEdge+20, 285);
+        graphics.drawString("Pawns: " + pawn, leftEdge+20, 203);
+        graphics.drawString("Knights: " + knight, leftEdge+20, 231);
+        graphics.drawString("Bishops: " + bishop, leftEdge+20, 259);
+        graphics.drawString("Rooks: " + rook, leftEdge+20, 287);
         graphics.drawString("Queens: " + queen, leftEdge+20, 315);
         graphics.drawString("Chess Time: " + winnerTime/60 + ":" + String.format("%02d", winnerTime%60), leftEdge+20, 370);
 
@@ -764,7 +816,7 @@ public class ChessGame implements MouseListener, KeyListener{
             }
         }
     }
-    //if an M is typed, invert the mute status (music->silence and vice versa)
+    //if an M is typed, invert the mute status (music->silence and vice versa), and if u is typed in the chess game, undo the previous move
     public void keyTyped(KeyEvent e){
         if (e.getKeyChar() == 'm') {
             if (musicOn)
@@ -773,7 +825,39 @@ public class ChessGame implements MouseListener, KeyListener{
                 clip.loop(Clip.LOOP_CONTINUOUSLY);
             musicOn = !musicOn;
         }
+        else if(!bulletGame && e.getKeyChar() == 'u'){
+            //swap the pieces with those of the previous game state and repaint
+            if(undoWhite != null){
+                swap(white, undoWhite);
+                swap(black, undoBlack);
+            }
 
+            panel.repaint();
+        }
+    }
+
+    //deeply swap two arraylists
+    public void swap(ArrayList<GamePiece> p1, ArrayList<GamePiece> p2){
+        GamePiece temp;
+
+        //switch the pieces in the main-body of the arraylists
+        for(int i = 0; i < Math.min(p1.size(), p2.size()); i++){
+            temp = p1.remove(i);
+            p1.add(i, p2.remove(i));
+            p2.add(i, temp);
+        }
+        
+        //swap the pieces of different sizes (for arraylists of different sizes)
+        if(p1.size() > p2.size()){
+            int targetSize = p2.size();
+            while(p1.size() > targetSize)
+                p2.add(p1.remove(p1.size()-1));
+        }
+        else if(p2.size() > p1.size()){
+            int targetSize = p1.size();
+            while(p2.size() > targetSize)
+                p1.add(p2.remove(p2.size()-1));
+        }
     }
 
     //method declarations for unused listener functions

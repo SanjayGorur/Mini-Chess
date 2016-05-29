@@ -2,6 +2,13 @@ import javax.swing.*;
 import java.awt.*;
 import java.util.ArrayList;
 
+/* Wholly superfluous class. Rendering is done actively in ChessGame and the game logic would
+ * be better handled in that class, but the code was already messy enough, so this class gave
+ * necessary structure. Additionally, there was a slight error on disregarding the class, so
+ * reorginization would be time consuming for no real benefit, since no others will be working
+ * with this code.
+ */
+
 public class BulletPanel extends JPanel{
     //fields for the unadded black/white pieces, added black/white, and current time in milliseconds
     private ArrayList<GamePiece> blackRemaining, whiteRemaining, black, white;

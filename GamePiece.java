@@ -102,6 +102,7 @@ public abstract class GamePiece {
 
         return moves;
     }
+    
     //adds a move if the move is legal
     public void addMove(ArrayList<Point> moves, Point loc, ArrayList<GamePiece> friendPieces){
         //if the move is on to a friendly piece, stop checking
@@ -113,6 +114,8 @@ public abstract class GamePiece {
         if(loc.getX() >= 0 && loc.getY() >= 0 && loc.getX() <= 7 && loc.getY() <= 7)
             moves.add(loc);
     }
+    
+    //adds a move if there is a foe on the spot
     public void addIfFoe(ArrayList<Point> moves, ArrayList<GamePiece> foePieces, Point loc){
         if(ChessGame.findPiece(foePieces, loc) != null)
             moves.add(new Point(loc));

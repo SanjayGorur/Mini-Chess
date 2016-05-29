@@ -9,6 +9,16 @@ import static java.awt.event.KeyEvent.*;
 import java.io.*;
 import javax.sound.sampled.*;
 
+/*  Mini-Chess, By Scott Stewart
+ *  
+ *  A combination of a minimalistic version of chess with a bullet-hell style game based on
+ *  chess performance. Mute/unmute with m and undo/redo with u.
+ *
+ *  Control mainly goes through the following path throughout the program: main() during
+ *  initialization, mousePressed() (and ChessPanel) during chess, and BulletThread's run()
+ *  during the bullet-hell game.
+ */ 
+
 public class ChessGame implements MouseListener, KeyListener{
     //declarations for assorted fields used throughout the game
     private static ArrayList<GamePiece> black, white, removedBlack, removedWhite, undoBlack, undoWhite;
@@ -89,6 +99,7 @@ public class ChessGame implements MouseListener, KeyListener{
         bulletPanel = new BulletPanel(removedBlack, removedWhite, black.get(black.size()-1), white.get(white.size()-1));
 
         //instantiate cards (for panel switching) and add panel/bulletpanel, showing chess initially
+        //note, bulletPanel is added seemingly unnecessarily, but the canvas used later has an anamolous error on clearing that is fixed by adding the bulletPanel, so it has a vestigial (and frustrating) function
         overall = new JPanel(new CardLayout());
         overall.add(panel, "Chess");
         overall.add(bulletPanel, "Bullet");
@@ -121,6 +132,7 @@ public class ChessGame implements MouseListener, KeyListener{
     }
 
     //Returns the piece at a given point out of a given array list, returning null if none are found
+    //Public because it is often used in GamePiece and subclasses
     public static GamePiece findPiece(ArrayList<GamePiece> pieces, Point p){
         for(GamePiece piece: pieces)
             if(piece.getLocation().equals(p))
@@ -128,7 +140,7 @@ public class ChessGame implements MouseListener, KeyListener{
         return null;
     }
 
-    //event on mousePress
+    //event on mousePress (handle piece selection and movement)
     public void mousePressed(MouseEvent e){
         //get point on chess grid and active piece (highlighted)
         Point gridPoint = new Point(e.getX() / 50, (e.getY() - 25) / 50);
@@ -147,15 +159,17 @@ public class ChessGame implements MouseListener, KeyListener{
             foeRM = removedWhite;
         }
 
-        if(clicked == null){//if none are already clicked, select piece on grid
+        //if none are already clicked, select piece on grid
+        if(clicked == null){
             clicked = findPiece(friend, gridPoint);
 
-            if (clicked != null) {//if there is a piece at mouse click, activate the piece and set active moves to trimmed set of moves
+            //if there is a piece at mouse click, activate the piece and set active moves to trimmed set of moves
+            if(clicked != null){
                 panel.activate(clicked);
                 panel.setMoves(trimMoves(clicked, friend, foe));
             }
-        }
-        else{//if there is an active piece, get location and move
+        }//if there is an active piece, get location and move
+        else{
             //find if point clicked is on any legal moves
             boolean hasPoint = false;
             for(Point p: panel.getMoves())
@@ -228,9 +242,10 @@ public class ChessGame implements MouseListener, KeyListener{
         //get raw moves (before trimming)
         ArrayList<Point> moves = p.getMoves(friendPieces, foePieces);
 
+        //move clicked piece to all possible locations
         GamePiece temp;
         Point origLoc = p.getLocation();
-        for (int i = 0; i < moves.size(); i++) {//move clicked piece to all possible locations
+        for (int i = 0; i < moves.size(); i++) {
             //move clicked piece to location of move
             p.setLocation(moves.get(i));
 
@@ -252,16 +267,17 @@ public class ChessGame implements MouseListener, KeyListener{
         //reset the clicked piece to its original location after parsing move list
         p.setLocation(origLoc);
 
-        //return all potential moves
+        //return all potential trimmed moves
         return moves;
     }
 
     //Returns king if the "friend" is in check, null otherwise
+    //Public due to use in ChessPanel
     public static GamePiece inCheck(ArrayList<GamePiece> friendPieces, ArrayList<GamePiece> foePieces){
+        //add all enemy moves to arraylist in order to see if any can attack king
         ArrayList<Point> enemyMoves = new ArrayList<>();
         for(GamePiece p: foePieces)
-
-            if(p.getID().equals("K")) {//add simple king moves to avoid indirect recursion
+            if(p.getID().equals("K")){//add simple king moves to avoid indirect recursion
                 enemyMoves.add(new Point(p.getLocation()).incX(1));
                 enemyMoves.add(new Point(p.getLocation()).incX(-1));
                 enemyMoves.add(new Point(p.getLocation()).incY(1));
@@ -288,6 +304,7 @@ public class ChessGame implements MouseListener, KeyListener{
         //otherwise, return null
         return null;
     }
+
     //return name of person in checkmate, null otherwise
     public static void checkmate(){
         //add all potential white moves to one list
@@ -420,10 +437,12 @@ public class ChessGame implements MouseListener, KeyListener{
         }
     }
 
-    private static class BulletThread implements Runnable{//calls game loop in new thread based on checkmate
+    //calls game loop in new thread based on checkmate (new thread allows the checkmate logic to run to completion concurrently)
+    private static class BulletThread implements Runnable{
         ArrayList<GamePiece> addTo;
         public BulletThread(ArrayList<GamePiece> removed){addTo = removed;}
-        public void run() {//creates and executes the entire bullet game
+        //creates and executes the entire bullet game
+        public void run(){
             //set field for current bullet game execution
             bulletGame = true;
 
@@ -620,9 +639,13 @@ public class ChessGame implements MouseListener, KeyListener{
                 running = running && (whiteTimeLeft>0 || blackTimeLeft>0);
                 suddenDeath = suddenDeath && whiteCollisions == blackCollisions;
                 
+                //if the loop has finished its main execution and it's tied, initiate sudden death sequence
                 if(!running && !suddenDeath && whiteCollisions == blackCollisions){
+                    //set variable for sudden death to true and pause the music
                     suddenDeath = true;
                     clip.stop();
+
+                    //alternate flashes of "SUDDEN" and "DEATH"  across the screen at random colors1/10 second apart, leaving a section of no text in between
                     for(int i = 0; i < 30; i++){
                         render(graphics, buffer, FPS, whiteTime, blackTime);
                         if(i%2 == 0){
@@ -637,10 +660,13 @@ public class ChessGame implements MouseListener, KeyListener{
                             buffer.show();
                         try{Thread.sleep(100);}catch(Exception e){e.printStackTrace();}
                     }
+
+                    //turn the music back on
                     if(musicOn)
                         clip.loop(Clip.LOOP_CONTINUOUSLY);
                 }
-                //double if it's been the necessary time
+
+                //double if it's been the necessary time (will always happen at initial SD)
                 if(suddenDeath && now-lastDub > timePerDub){
                     ArrayList<GamePiece> newBlack = doublePieces(bulletPanel.black());
                     ArrayList<GamePiece> newWhite = doublePieces(bulletPanel.white());
@@ -652,7 +678,7 @@ public class ChessGame implements MouseListener, KeyListener{
 
                     bulletPanel.black().addAll(newBlack);
                     bulletPanel.white().addAll(newWhite);
-                    lastDub = System.nanoTime();;
+                    lastDub = System.nanoTime();
                 }
 
                 //yield to other threads at least once, until it has been at least the specified time between tics
@@ -668,6 +694,8 @@ public class ChessGame implements MouseListener, KeyListener{
                 winner(graphics, buffer, "Black", blackTime, bulletPanel.black(), blackCollisions, whiteCollisions, 0, Color.BLACK, Color.WHITE);
         }
     }
+
+    //render the bullet game, using the bulletPanel as a base for piece/box drawing and accepting all text to draw
     private static void render(Graphics graphics, BufferStrategy buffer, Double FPS, int whiteTime, int blackTime){
         //add the pieces painting and other parts of bulletPanel-based painting
         graphics = buffer.getDrawGraphics();
@@ -685,6 +713,8 @@ public class ChessGame implements MouseListener, KeyListener{
         graphics.setColor(Color.WHITE);
         graphics.drawString("Pieces left: " + String.format("%02d", removedBlack.size()) + ".  Collisions: " + String.format("%02d", blackCollisions) + ". Time: " + formatTime(blackTime) + ".", 349, 20);
     }
+
+    //execute the winning sequence (with superfluous stats)
     private static void winner(Graphics graphics, BufferStrategy buffer, String winnerName, int winnerTime, ArrayList<GamePiece> pieces, int winnerCollisions, int loserCollisions, int leftEdge, Color box, Color text){
         //fade losing side to color of winning side
         for(int i = 1; i <= 255; i++){
@@ -785,6 +815,7 @@ public class ChessGame implements MouseListener, KeyListener{
             }
         }
     }
+
     //on the release of a key, reset the corresponding L/R/U/D increments to zero, ending movement in that direction until keypress again
     public void keyReleased(KeyEvent e){
         if(bulletGame){
@@ -816,6 +847,7 @@ public class ChessGame implements MouseListener, KeyListener{
             }
         }
     }
+
     //if an M is typed, invert the mute status (music->silence and vice versa), and if u is typed in the chess game, undo the previous move
     public void keyTyped(KeyEvent e){
         if (e.getKeyChar() == 'm') {
